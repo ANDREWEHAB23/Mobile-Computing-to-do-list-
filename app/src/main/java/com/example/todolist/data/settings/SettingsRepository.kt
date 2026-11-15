@@ -1,5 +1,4 @@
-package com.example.todolist.dataSettings
-
+package com.example.todolist.data.settings
 
 import android.content.Context
 import androidx.datastore.core.IOException

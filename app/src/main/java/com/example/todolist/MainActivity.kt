@@ -18,6 +18,11 @@ import com.example.todolist.model.Task
 import com.example.todolist.ui.components.AddEditTaskDialog
 import com.example.todolist.ui.components.TaskListContent
 import com.example.todolist.ui.theme.ToDoListTheme
+import androidx.compose.material.icons.filled.Settings
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.todolist.data.settings.SortOrder
+import com.example.todolist.ui.settings.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -27,7 +32,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            ToDoListTheme {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+
+            ToDoListTheme(darkTheme = settings.darkMode) {
                 // Local UI state using remember and mutableStateOf
                 var tasks by remember {
                     mutableStateOf(
@@ -41,7 +49,16 @@ class MainActivity : ComponentActivity() {
 
                 var isDialogVisible by remember { mutableStateOf(false) }
                 var taskToEdit by remember { mutableStateOf<Task?>(null) }
-
+                val sortedTasks = when (settings.sortOrder) {
+                    SortOrder.DATE -> tasks.sortedBy { it.dueDate }
+                    SortOrder.PRIORITY -> tasks.sortedBy {
+                        when (it.priority) {
+                            "High" -> 0
+                            "Medium" -> 1
+                            else -> 2
+                        }
+                    }
+                }
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
@@ -51,6 +68,13 @@ class MainActivity : ComponentActivity() {
                                     text = "To-Do List",
                                     fontWeight = FontWeight.Bold
                                 )
+                            },
+                            actions = {
+                                IconButton(onClick = {
+                                    startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                                }) {
+                                    Icon(Icons.Default.Settings, contentDescription = "Settings")
+                                }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -71,7 +95,7 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
                     TaskListContent(
-                        tasks = tasks,
+                        tasks = sortedTasks,
                         onToggleCompletion = { taskId ->
                             tasks = tasks.map {
                                 if (it.id == taskId) {
