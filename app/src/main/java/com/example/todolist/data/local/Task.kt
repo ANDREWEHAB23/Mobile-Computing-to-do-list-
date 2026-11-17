@@ -1,8 +1,6 @@
 package com.example.todolist.data.local
-
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-
 @Entity(tableName = "tasks")
 data class Task(
     @PrimaryKey(autoGenerate = true)

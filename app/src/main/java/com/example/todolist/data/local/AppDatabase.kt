@@ -3,7 +3,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-
 @Database(
     entities = [Task::class],
     version = 1,
@@ -14,7 +13,6 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
-
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {//3lshan elSingleton anna n3mel database wahda bs
                 val instance = Room.databaseBuilder(
@@ -22,7 +20,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "todo_database"
                 ).build()
-
                 INSTANCE = instance
                 instance
             }
