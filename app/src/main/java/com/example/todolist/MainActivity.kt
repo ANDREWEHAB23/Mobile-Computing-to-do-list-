@@ -18,6 +18,7 @@ import com.example.todolist.model.Task
 import com.example.todolist.ui.components.AddEditTaskDialog
 import com.example.todolist.ui.components.TaskListContent
 import com.example.todolist.ui.theme.ToDoListTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -42,8 +43,12 @@ class MainActivity : ComponentActivity() {
                 var isDialogVisible by remember { mutableStateOf(false) }
                 var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
+                val snackbarHostState = remember { SnackbarHostState() }
+                val scope = rememberCoroutineScope()
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                     topBar = {
                         TopAppBar(
                             title = {
@@ -92,8 +97,24 @@ class MainActivity : ComponentActivity() {
                             isDialogVisible = true
                         },
                         onDeleteTask = { taskId ->
+
+                            val deletedTask = tasks.find { it.id == taskId }
                             tasks = tasks.filter { it.id != taskId }
-                            Toast.makeText(this, "Task deleted", Toast.LENGTH_SHORT).show()
+
+
+                            if (deletedTask != null) {
+                                scope.launch {
+                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Task deleted",
+                                        actionLabel = "Undo",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        tasks = tasks + deletedTask
+                                    }
+                                }
+                            }
                         },
                         onTaskClick = { task ->
                             // --- EXPLICIT INTENT ---

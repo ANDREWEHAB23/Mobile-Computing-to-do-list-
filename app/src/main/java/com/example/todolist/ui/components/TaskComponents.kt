@@ -2,6 +2,7 @@ package com.example.todolist.ui.components
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -46,18 +48,57 @@ fun TaskListContent(
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
             items(tasks, key = { it.id }) { task ->
-                TaskItemCard(
-                    task = task,
-                    onToggleCompletion = { onToggleCompletion(task.id) },
-                    onEdit = { onEditTask(task) },
-                    onDelete = { onDeleteTask(task.id) },
-                    onClick = { onTaskClick(task) },
-                    onShare = { onShareTask(task) }
-                )
+                val dismissState = rememberSwipeToDismissBoxState()
+
+                LaunchedEffect(tasks) {
+                    if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
+                        dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                    }
+                }
+
+                SwipeToDismissBox(
+                    state = dismissState,
+                    enableDismissFromStartToEnd = false,
+                    onDismiss = { dismissValue ->
+                        if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                            onDeleteTask(task.id)
+                        }
+                    },
+                    backgroundContent = {
+                        val isSwipingLeft = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSwipingLeft) Color.Red else Color.Transparent)
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            if (isSwipingLeft) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Task",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                ) {
+                    TaskItemCard(
+                        task = task,
+                        onToggleCompletion = { onToggleCompletion(task.id) },
+                        onEdit = { onEditTask(task) },
+                        onDelete = { onDeleteTask(task.id) },
+                        onClick = { onTaskClick(task) },
+                        onShare = { onShareTask(task) }
+                    )
+                }
             }
+
         }
     }
 }
+
 
 @Composable
 fun EmptyTaskState(
