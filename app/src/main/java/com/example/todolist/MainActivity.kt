@@ -9,15 +9,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.todolist.data.settings.SortOrder
 import com.example.todolist.model.Task
 import com.example.todolist.ui.components.AddEditTaskDialog
 import com.example.todolist.ui.components.TaskListContent
+import com.example.todolist.ui.settings.SettingsViewModel
 import com.example.todolist.ui.theme.ToDoListTheme
+import com.example.todolist.viewmodel.TaskViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -27,30 +32,38 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            ToDoListTheme {
-                // Local UI state using remember and mutableStateOf
-                var tasks by remember {
-                    mutableStateOf(
-                        listOf(
-                            Task(1, "Mobile Computing Project", "Implement Compose UI and Intents", "High", "2025-06-15", false),
-                            Task(2, "Study Kotlin", "Learn Coroutines and Flow", "Medium", "2025-06-18", true),
-                            Task(3, "Buy Groceries", "Milk, eggs, and bread", "Low", "2025-06-10", false)
-                        )
-                    )
-                }
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
 
+            val taskViewModel: TaskViewModel = viewModel()
+            val tasks by taskViewModel.tasks.collectAsStateWithLifecycle()
+
+            ToDoListTheme(darkTheme = settings.darkMode) {
                 var isDialogVisible by remember { mutableStateOf(false) }
                 var taskToEdit by remember { mutableStateOf<Task?>(null) }
+
+                val sortedTasks = when (settings.sortOrder) {
+                    SortOrder.DATE -> tasks.sortedBy { it.dueDate }
+                    SortOrder.PRIORITY -> tasks.sortedBy {
+                        when (it.priority) {
+                            "High" -> 0
+                            "Medium" -> 1
+                            else -> 2
+                        }
+                    }
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         TopAppBar(
-                            title = {
-                                Text(
-                                    text = "To-Do List",
-                                    fontWeight = FontWeight.Bold
-                                )
+                            title = { Text("To-Do List", fontWeight = FontWeight.Bold) },
+                            actions = {
+                                IconButton(onClick = {
+                                    startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                                }) {
+                                    Icon(Icons.Default.Settings, contentDescription = "Settings")
+                                }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -71,20 +84,12 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
                     TaskListContent(
-                        tasks = tasks,
+                        tasks = sortedTasks,
                         onToggleCompletion = { taskId ->
-                            tasks = tasks.map {
-                                if (it.id == taskId) {
-                                    val updated = it.copy(isCompleted = !it.isCompleted)
-                                    Toast.makeText(
-                                        this,
-                                        if (updated.isCompleted) "Task completed" else "Task marked active",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    updated
-                                } else {
-                                    it
-                                }
+                            val task = tasks.find { it.id == taskId }
+                            if (task != null) {
+                                taskViewModel.toggleTaskCompletion(task)
+                                Toast.makeText(this, "Task updated", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onEditTask = { task ->
@@ -92,12 +97,13 @@ class MainActivity : ComponentActivity() {
                             isDialogVisible = true
                         },
                         onDeleteTask = { taskId ->
-                            tasks = tasks.filter { it.id != taskId }
-                            Toast.makeText(this, "Task deleted", Toast.LENGTH_SHORT).show()
+                            val task = tasks.find { it.id == taskId }
+                            if (task != null) {
+                                taskViewModel.deleteTask(task)
+                                Toast.makeText(this, "Task deleted", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         onTaskClick = { task ->
-                            // --- EXPLICIT INTENT ---
-                            // Explicitly specifies TaskDetailActivity as the target component
                             val intent = Intent(this, TaskDetailActivity::class.java).apply {
                                 putExtra(TaskDetailActivity.EXTRA_TITLE, task.title)
                                 putExtra(TaskDetailActivity.EXTRA_DESCRIPTION, task.description)
@@ -108,8 +114,6 @@ class MainActivity : ComponentActivity() {
                             startActivity(intent)
                         },
                         onShareTask = { task ->
-                            // --- IMPLICIT INTENT ---
-                            // Declares ACTION_SEND without specifying a component, letting Android resolve share apps
                             val shareText = "Task: ${task.title}\nDescription: ${task.description}\nPriority: ${task.priority}\nDue: ${task.dueDate}"
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
@@ -122,7 +126,6 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding)
                     )
 
-                    // Add / Edit Task Dialog with DatePickerDialog & Validation
                     if (isDialogVisible) {
                         AddEditTaskDialog(
                             task = taskToEdit,
@@ -133,32 +136,24 @@ class MainActivity : ComponentActivity() {
                             onSave = { title, description, priority, dueDate ->
                                 val editing = taskToEdit
                                 if (editing == null) {
-                                    // Add new task
                                     val newTask = Task(
-                                        id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
+                                        id = 0,
                                         title = title,
                                         description = description,
                                         priority = priority,
                                         dueDate = dueDate,
                                         isCompleted = false
                                     )
-                                    tasks = listOf(newTask) + tasks
-                                    Toast.makeText(this, "New task added", Toast.LENGTH_SHORT).show()
+                                    taskViewModel.addTask(newTask)
                                 } else {
-                                    // Update existing task
-                                    tasks = tasks.map { task ->
-                                        if (task.id == editing.id) {
-                                            task.copy(
-                                                title = title,
-                                                description = description,
-                                                priority = priority,
-                                                dueDate = dueDate
-                                            )
-                                        } else {
-                                            task
-                                        }
-                                    }
-                                    Toast.makeText(this, "Task edited", Toast.LENGTH_SHORT).show()
+                                    taskViewModel.updateTask(
+                                        editing.copy(
+                                            title = title,
+                                            description = description,
+                                            priority = priority,
+                                            dueDate = dueDate
+                                        )
+                                    )
                                 }
                                 isDialogVisible = false
                                 taskToEdit = null

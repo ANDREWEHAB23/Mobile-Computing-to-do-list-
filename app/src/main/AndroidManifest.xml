@@ -28,6 +28,9 @@
             android:exported="false"
             android:label="Task Detail"
             android:theme="@style/Theme.ToDoList" />
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

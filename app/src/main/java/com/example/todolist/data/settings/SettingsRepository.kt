@@ -1,5 +1,4 @@
-package com.example.todolist.dataSettings
-
+package com.example.todolist.data.settings
 
 import android.content.Context
 import androidx.datastore.core.IOException
@@ -19,7 +18,7 @@ data class UserSettings(
     val sortOrder: SortOrder = SortOrder.DATE
 )
 
-// one datastore instance per app
+//just one datastore instance per app
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
 class SettingsRepository(private val context: Context) {

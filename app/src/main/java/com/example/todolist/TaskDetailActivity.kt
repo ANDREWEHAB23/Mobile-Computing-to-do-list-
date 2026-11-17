@@ -32,7 +32,7 @@ class TaskDetailActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // --- EXPLICIT INTENT: Receiving data passed from MainActivity ---
+        // --- EXPLICIT INTENT: receive data passed from MainActivity ---
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "No Title"
         val description = intent.getStringExtra(EXTRA_DESCRIPTION) ?: "No Description"
         val priority = intent.getStringExtra(EXTRA_PRIORITY) ?: "Medium"
@@ -123,7 +123,7 @@ class TaskDetailActivity : ComponentActivity() {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // --- IMPLICIT INTENT: Sharing task details ---
+                            // --- IMPLICIT INTENT: Share task details ---
                             Button(
                                 onClick = {
                                     val shareText = "Task: $title\nDescription: $description\nPriority: $priority\nDue: $dueDate"
