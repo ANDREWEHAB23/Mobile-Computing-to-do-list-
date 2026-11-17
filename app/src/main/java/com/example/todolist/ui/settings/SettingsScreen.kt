@@ -39,7 +39,7 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-
+            //make gear icon
     Scaffold(
         topBar = {
             TopAppBar(

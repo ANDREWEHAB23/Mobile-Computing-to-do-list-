@@ -144,7 +144,7 @@ fun TaskItemCard(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Action buttons (Share, Edit, Delete)
+            //action buttons (Share, Edit, Delete)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -329,7 +329,7 @@ fun AddEditTaskDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Priority Level selection using FilterChips
+                // select priority level using FilterChips
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Priority Level",
