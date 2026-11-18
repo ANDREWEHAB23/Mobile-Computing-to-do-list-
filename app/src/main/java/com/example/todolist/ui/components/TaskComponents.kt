@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.todolist.model.Task
 import java.util.Calendar
+import java.time.LocalDate
 
 @Composable
 fun TaskListContent(
@@ -192,7 +193,7 @@ fun TaskItemCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor =Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -374,7 +375,9 @@ fun AddEditTaskDialog(
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
     var priority by remember { mutableStateOf(task?.priority ?: "Medium") }
-    var dueDate by remember { mutableStateOf(task?.dueDate ?: "2025-06-25") }
+    var dueDate by remember {
+        mutableStateOf(task?.dueDate ?: LocalDate.now().plusDays(1).toString())
+    }
     var titleError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
