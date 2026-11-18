@@ -1,11 +1,15 @@
+
 package com.example.todolist.ui.components
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -24,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.todolist.model.Task
 import java.util.Calendar
+import java.time.LocalDate
 
 @Composable
 fun TaskListContent(
@@ -33,30 +38,122 @@ fun TaskListContent(
     onDeleteTask: (Int) -> Unit,
     onTaskClick: (Task) -> Unit,
     onShareTask: (Task) -> Unit,
+    selectedFilter: String,
+    onFilterChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val filters = listOf("All", "Active", "Completed")
+    val filteredTasks = when (selectedFilter) {
+        "Active" -> tasks.filter { !it.isCompleted }
+        "Completed" -> tasks.filter { it.isCompleted }
+        else -> tasks
+    }
     if (tasks.isEmpty()) {
         EmptyTaskState(modifier = modifier)
     } else {
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
+        Column(
+            modifier = modifier.fillMaxSize()
         ) {
-            items(tasks, key = { it.id }) { task ->
-                TaskItemCard(
-                    task = task,
-                    onToggleCompletion = { onToggleCompletion(task.id) },
-                    onEdit = { onEditTask(task) },
-                    onDelete = { onDeleteTask(task.id) },
-                    onClick = { onTaskClick(task) },
-                    onShare = { onShareTask(task) }
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                filters.forEach { filter ->
+                    FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { onFilterChange(filter) },
+                        label = { Text(filter) }
+                    )
+                }
+            }
+            if (filteredTasks.isEmpty()) {//3lshan lw mafesh tasks fe elfilter elly ekhtarto
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No tasks in this filter.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(filteredTasks, key = { it.id }) { task ->
+
+                        SwipeToDeleteTaskItem(
+                            onDelete = { onDeleteTask(task.id) }//3lsshan amsh mn eldatabase lma y3mel swipe
+                        ) {
+                            TaskItemCard(
+                                task = task,
+                                onToggleCompletion = {
+                                    onToggleCompletion(task.id)
+                                },
+                                onEdit = { onEditTask(task) },
+                                onDelete = { onDeleteTask(task.id) },
+                                onClick = { onTaskClick(task) },
+                                onShare = { onShareTask(task) }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
+}@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToDeleteTaskItem(
+    onDelete: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {//endToStart y3ny bswipe mn right To left
+                onDelete()
+                true //wafe't letaghyer halet elstatre le dismiss
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,//bmn3 eldismiss mn elLeft To Right
+        enableDismissFromEndToStart = true,
+        backgroundContent = {//elly byzhar wara lma aswipe elcard
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = MaterialTheme.colorScheme.error,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Task",
+                    tint = Color.White
+                )
+            }
+        },
+        content = {
+            content()
+        }
+    )
 }
 
 @Composable
@@ -74,7 +171,6 @@ fun EmptyTaskState(
         )
     }
 }
-
 @Composable
 fun TaskItemCard(
     task: Task,
@@ -97,7 +193,7 @@ fun TaskItemCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -279,7 +375,9 @@ fun AddEditTaskDialog(
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
     var priority by remember { mutableStateOf(task?.priority ?: "Medium") }
-    var dueDate by remember { mutableStateOf(task?.dueDate ?: "2025-06-25") }
+    var dueDate by remember {
+        mutableStateOf(task?.dueDate ?: LocalDate.now().plusDays(1).toString())
+    }
     var titleError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
