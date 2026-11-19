@@ -1,12 +1,15 @@
+
 package com.example.todolist.ui.components
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -17,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.todolist.model.Task
 import java.util.Calendar
+import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @Composable
 fun TaskListContent(
@@ -35,70 +39,176 @@ fun TaskListContent(
     onDeleteTask: (Int) -> Unit,
     onTaskClick: (Task) -> Unit,
     onShareTask: (Task) -> Unit,
+    selectedFilter: String,
+    onFilterChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val filters = listOf("All", "Active", "Completed")
+
+    val filteredTasks = when (selectedFilter) {
+        "Active" -> tasks.filter { !it.isCompleted }
+        "Completed" -> tasks.filter { it.isCompleted }
+        else -> tasks
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() } //Snackbar elmessage elly tban lluser taht
+    val scope = rememberCoroutineScope()
+
+    var pendingDeleteIds by remember { //3lshan a ave elIDs lma y3ml elswipe 3obal ma a3rf h3mel delete wla la
+        mutableStateOf<Set<Int>>(emptySet())
+    }
+
+    val visibleTasks = filteredTasks.filterNot {
+        it.id in pendingDeleteIds //elly byshel eltask mn elUI
+    }
+
     if (tasks.isEmpty()) {
         EmptyTaskState(modifier = modifier)
     } else {
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
+        Box(
+            modifier = modifier.fillMaxSize()
         ) {
-            items(tasks, key = { it.id }) { task ->
-                val dismissState = rememberSwipeToDismissBoxState()
-
-                LaunchedEffect(tasks) {
-                    if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
-                        dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { onFilterChange(filter) },
+                            label = { Text(filter) }
+                        )
                     }
                 }
 
-                SwipeToDismissBox(
-                    state = dismissState,
-                    enableDismissFromStartToEnd = false,
-                    onDismiss = { dismissValue ->
-                        if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
-                            onDeleteTask(task.id)
-                        }
-                    },
-                    backgroundContent = {
-                        val isSwipingLeft = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSwipingLeft) Color.Red else Color.Transparent)
-                                .padding(horizontal = 20.dp),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            if (isSwipingLeft) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete Task",
-                                    tint = Color.White
+                if (visibleTasks.isEmpty()) {
+                    // 3lshan lw mafesh tasks fe elfilter elly ekhtarto
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No tasks in this filter.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        items(visibleTasks, key = { it.id }) { task ->
+
+                            SwipeToDeleteTaskItem(
+                                onDelete = {
+                                    // bahot elitem elly et3mlo swipe fe elSet
+                                    pendingDeleteIds = pendingDeleteIds + task.id
+
+                                    // hawreh elmessage w astna ashof hykhtar eh
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Task deleted",
+                                            actionLabel = "UNDO",
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            // lw ekhtsr UNDO hrg3lo eltask
+                                            pendingDeleteIds =
+                                                pendingDeleteIds - task.id
+                                        } else {
+                                            onDeleteTask(task.id)
+                                        }
+                                    }
+                                }
+                            ) {
+                                TaskItemCard(
+                                    task = task,
+                                    onToggleCompletion = {
+                                        onToggleCompletion(task.id)
+                                    },
+                                    onEdit = { onEditTask(task) },
+                                    onDelete = { onDeleteTask(task.id) },
+                                    onClick = { onTaskClick(task) },
+                                    onShare = { onShareTask(task) }
                                 )
                             }
                         }
                     }
-                ) {
-                    TaskItemCard(
-                        task = task,
-                        onToggleCompletion = { onToggleCompletion(task.id) },
-                        onEdit = { onEditTask(task) },
-                        onDelete = { onDeleteTask(task.id) },
-                        onClick = { onTaskClick(task) },
-                        onShare = { onShareTask(task) }
-                    )
                 }
             }
 
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToDeleteTaskItem(
+    onDelete: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                // endToStart y3ny bswipe mn right To left
+                onDelete()
+                true
+            } else {
+                false
+            }
+        }
+    )
+    LaunchedEffect(Unit) {
+        dismissState.reset()//3lshan lma yerg3 be elUNDO yerg3 llstate eltabe3ya
+    }
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = MaterialTheme.colorScheme.error,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Task",
+                    tint = Color.White
+                )
+            }
+        },
+        content = {
+            content()
+        }
+    )
+}
 
 @Composable
 fun EmptyTaskState(
@@ -138,7 +248,7 @@ fun TaskItemCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -185,7 +295,7 @@ fun TaskItemCard(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Action buttons (Share, Edit, Delete)
+            // action buttons (Share, Edit, Delete)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -320,7 +430,9 @@ fun AddEditTaskDialog(
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
     var priority by remember { mutableStateOf(task?.priority ?: "Medium") }
-    var dueDate by remember { mutableStateOf(task?.dueDate ?: "2025-06-25") }
+    var dueDate by remember {
+        mutableStateOf(task?.dueDate ?: LocalDate.now().plusDays(1).toString())
+    }
     var titleError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -370,7 +482,7 @@ fun AddEditTaskDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Priority Level selection using FilterChips
+                // select priority level using FilterChips
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Priority Level",

@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.todolist.ui.theme.ToDoListTheme
-
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.todolist.ui.settings.SettingsViewModel
 class TaskDetailActivity : ComponentActivity() {
 
     companion object {
@@ -32,7 +35,7 @@ class TaskDetailActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // --- EXPLICIT INTENT: Receiving data passed from MainActivity ---
+        // --- EXPLICIT INTENT: receive data passed from MainActivity ---
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "No Title"
         val description = intent.getStringExtra(EXTRA_DESCRIPTION) ?: "No Description"
         val priority = intent.getStringExtra(EXTRA_PRIORITY) ?: "Medium"
@@ -40,7 +43,10 @@ class TaskDetailActivity : ComponentActivity() {
         val isCompleted = intent.getBooleanExtra(EXTRA_COMPLETED, false)
 
         setContent {
-            ToDoListTheme {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+
+            ToDoListTheme(darkTheme = settings.darkMode) {
                 Scaffold(
                     topBar = {
                         TopAppBar(
@@ -69,7 +75,7 @@ class TaskDetailActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                             ) {
                                 Column(
@@ -123,7 +129,7 @@ class TaskDetailActivity : ComponentActivity() {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // --- IMPLICIT INTENT: Sharing task details ---
+                            // --- IMPLICIT INTENT: Share task details ---
                             Button(
                                 onClick = {
                                     val shareText = "Task: $title\nDescription: $description\nPriority: $priority\nDue: $dueDate"

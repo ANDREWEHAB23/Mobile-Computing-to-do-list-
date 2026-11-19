@@ -38,7 +38,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun ToDoListTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Set dynamicColor to false by default so our custom Deep Navy & Electric Indigo theme shines consistently
+    //set dynamicColor to false by default so our custom Deep Navy & Electric Indigo theme appears consistently
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
