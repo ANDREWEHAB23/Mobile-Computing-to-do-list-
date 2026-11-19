@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.example.todolist.model.Task
 import java.util.Calendar
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @Composable
 fun TaskListContent(
@@ -43,75 +44,124 @@ fun TaskListContent(
     modifier: Modifier = Modifier
 ) {
     val filters = listOf("All", "Active", "Completed")
+
     val filteredTasks = when (selectedFilter) {
         "Active" -> tasks.filter { !it.isCompleted }
         "Completed" -> tasks.filter { it.isCompleted }
         else -> tasks
     }
+
+    val snackbarHostState = remember { SnackbarHostState() } //Snackbar elmessage elly tban lluser taht
+    val scope = rememberCoroutineScope()
+
+    var pendingDeleteIds by remember { //3lshan a ave elIDs lma y3ml elswipe 3obal ma a3rf h3mel delete wla la
+        mutableStateOf<Set<Int>>(emptySet())
+    }
+
+    val visibleTasks = filteredTasks.filterNot {
+        it.id in pendingDeleteIds //elly byshel eltask mn elUI
+    }
+
     if (tasks.isEmpty()) {
         EmptyTaskState(modifier = modifier)
     } else {
-        Column(
+        Box(
             modifier = modifier.fillMaxSize()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                filters.forEach { filter ->
-                    FilterChip(
-                        selected = selectedFilter == filter,
-                        onClick = { onFilterChange(filter) },
-                        label = { Text(filter) }
-                    )
-                }
-            }
-            if (filteredTasks.isEmpty()) {//3lshan lw mafesh tasks fe elfilter elly ekhtarto
-                Box(
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No tasks in this filter.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredTasks, key = { it.id }) { task ->
+                    filters.forEach { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { onFilterChange(filter) },
+                            label = { Text(filter) }
+                        )
+                    }
+                }
 
-                        SwipeToDeleteTaskItem(
-                            onDelete = { onDeleteTask(task.id) }//3lsshan amsh mn eldatabase lma y3mel swipe
-                        ) {
-                            TaskItemCard(
-                                task = task,
-                                onToggleCompletion = {
-                                    onToggleCompletion(task.id)
-                                },
-                                onEdit = { onEditTask(task) },
-                                onDelete = { onDeleteTask(task.id) },
-                                onClick = { onTaskClick(task) },
-                                onShare = { onShareTask(task) }
-                            )
+                if (visibleTasks.isEmpty()) {
+                    // 3lshan lw mafesh tasks fe elfilter elly ekhtarto
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No tasks in this filter.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        items(visibleTasks, key = { it.id }) { task ->
+
+                            SwipeToDeleteTaskItem(
+                                onDelete = {
+                                    // bahot elitem elly et3mlo swipe fe elSet
+                                    pendingDeleteIds = pendingDeleteIds + task.id
+
+                                    // hawreh elmessage w astna ashof hykhtar eh
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Task deleted",
+                                            actionLabel = "UNDO",
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            // lw ekhtsr UNDO hrg3lo eltask
+                                            pendingDeleteIds =
+                                                pendingDeleteIds - task.id
+                                        } else {
+                                            onDeleteTask(task.id)
+                                        }
+                                    }
+                                }
+                            ) {
+                                TaskItemCard(
+                                    task = task,
+                                    onToggleCompletion = {
+                                        onToggleCompletion(task.id)
+                                    },
+                                    onEdit = { onEditTask(task) },
+                                    onDelete = { onDeleteTask(task.id) },
+                                    onClick = { onTaskClick(task) },
+                                    onShare = { onShareTask(task) }
+                                )
+                            }
                         }
                     }
                 }
             }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+            )
         }
     }
-}@OptIn(ExperimentalMaterial3Api::class)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteTaskItem(
     onDelete: () -> Unit,
@@ -119,20 +169,24 @@ fun SwipeToDeleteTaskItem(
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { dismissValue ->
-            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {//endToStart y3ny bswipe mn right To left
+
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                // endToStart y3ny bswipe mn right To left
                 onDelete()
-                true //wafe't letaghyer halet elstatre le dismiss
+                true
             } else {
                 false
             }
         }
     )
-
+    LaunchedEffect(Unit) {
+        dismissState.reset()//3lshan lma yerg3 be elUNDO yerg3 llstate eltabe3ya
+    }
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = false,//bmn3 eldismiss mn elLeft To Right
+        enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
-        backgroundContent = {//elly byzhar wara lma aswipe elcard
+        backgroundContent = {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -171,6 +225,7 @@ fun EmptyTaskState(
         )
     }
 }
+
 @Composable
 fun TaskItemCard(
     task: Task,
@@ -240,7 +295,7 @@ fun TaskItemCard(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            //action buttons (Share, Edit, Delete)
+            // action buttons (Share, Edit, Delete)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
