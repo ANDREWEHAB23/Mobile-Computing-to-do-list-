@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.todolist.ui.theme.ToDoListTheme
-
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.todolist.ui.settings.SettingsViewModel
 class TaskDetailActivity : ComponentActivity() {
 
     companion object {
@@ -40,7 +43,10 @@ class TaskDetailActivity : ComponentActivity() {
         val isCompleted = intent.getBooleanExtra(EXTRA_COMPLETED, false)
 
         setContent {
-            ToDoListTheme {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+
+            ToDoListTheme(darkTheme = settings.darkMode) {
                 Scaffold(
                     topBar = {
                         TopAppBar(
